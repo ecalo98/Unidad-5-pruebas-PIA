@@ -1,0 +1,36 @@
+@startuml secuencia-registrar-pedido
+title Secuencia: registrar un pedido a domicilio (CU-01, flujo principal)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign left
+autonumber
+
+actor Caja
+participant "PedidoApplicationService" as PS
+participant "ControlDeAcceso" as CA
+participant "RegistrarPedidoHandler" as H
+participant "UnitOfWork" as UoW
+participant "Pedido" as P
+participant "PedidoRepository" as PR
+participant "PublicadorDeEventos" as EV
+
+Caja -> PS : registrarPedido(canal domicilio, líneas, datos del cliente)
+PS -> CA : verificarPermiso(Caja, registrar pedido)
+CA --> PS : permitido
+PS -> H : manejar(RegistrarPedido)
+H -> UoW : iniciar()
+H -> P : crear(canal, líneas, cliente, responsable)
+H -> P : confirmar()
+note over P
+  Aplica RN-01 (mínimo 150 MXN en domicilio)
+  y RN-14 (responsable y canal)
+end note
+P --> H : pedido confirmado + evento PedidoConfirmado
+H -> PR : guardar(pedido)
+H -> UoW : confirmar()
+H -> EV : publicar(PedidoConfirmado)
+H --> PS : id, total y estado
+PS --> Caja : pedido confirmado y enviado a cocina
+
+@enduml

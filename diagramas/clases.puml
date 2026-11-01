@@ -1,0 +1,222 @@
+@startuml clases
+title Sazón Urbano - Diagrama de clases (dominio, aplicación e infraestructura)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassBorderColor #444444
+skinparam ArrowColor #555555
+skinparam defaultFontName Arial
+
+package "Dominio" #E1F5EE {
+  class Pedido <<AggregateRoot>> {
+    +PedidoId id
+    +Canal canal
+    +EstadoPedido estado
+    +Dinero total
+    +{static} crear(canal, lineas, cliente, responsable)
+    +confirmar()
+    +aplicarPromocion(promocionAplicada)
+    +cancelar(solicitante, motivo, autorizador)
+    +quitarLinea(lineaId, productoAgotado)
+    +marcarListo()
+    +marcarEntregado()
+    +marcarEntregaNoCompletada()
+  }
+  class LineaPedido <<Entidad>> {
+    +producto
+    +cantidad
+    +modificaciones
+  }
+  class PreparacionEstacion <<Entidad>> {
+    +estacion
+    +estado
+  }
+  class Cancelacion <<ValueObject>> {
+    +tipo
+    +motivo
+    +autorizadoPor
+  }
+  class PromocionAplicada <<ValueObject>> {
+    +promocionId
+    +descuento
+  }
+  class Dinero <<ValueObject>> {
+    +monto
+    +moneda
+  }
+  class Promocion <<AggregateRoot>> {
+    +PromocionId id
+    +esAplicableEn(fechaHora, productos)
+    +calcularDescuento(pedido)
+  }
+  class Vigencia <<ValueObject>> {
+    +dias
+    +horario
+  }
+  class Entrega <<AggregateRoot>> {
+    +EntregaId id
+    +estado
+    +asignar(repartidorId)
+    +registrarSalida()
+    +confirmar()
+    +fallar(motivo)
+  }
+  class Repartidor <<AggregateRoot>> {
+    +RepartidorId id
+    +disponible
+    +asignar()
+    +liberar()
+  }
+  class Merma <<AggregateRoot>> {
+    +MermaId id
+    +motivo
+    +responsable
+  }
+  class AplicadorDePromocion <<DomainService>> {
+    +aplicar(pedido, promocion, fechaHora)
+  }
+  class AsignadorDeRepartidor <<DomainService>> {
+    +asignar(entrega, repartidor)
+  }
+  interface PedidoRepository {
+    +obtenerPorId(pedidoId)
+    +guardar(pedido)
+  }
+  interface PromocionRepository {
+    +obtenerPorId(promocionId)
+  }
+  interface EntregaRepository {
+    +obtenerPorId(entregaId)
+    +guardar(entrega)
+  }
+  interface RepartidorRepository {
+    +obtenerPorId(repartidorId)
+    +guardar(repartidor)
+  }
+  interface MermaRepository {
+    +guardar(merma)
+  }
+  interface DisponibilidadRepository {
+    +marcarAgotado(producto, responsable, fechaHora)
+  }
+  interface UnitOfWork {
+    +iniciar()
+    +confirmar()
+    +deshacer()
+  }
+}
+
+package "Aplicación" #E6F1FB {
+  class PedidoApplicationService <<ApplicationService>> {
+    +registrarPedido(comando)
+    +aplicarPromocion(comando)
+    +cancelarPedido(comando)
+  }
+  class DisponibilidadApplicationService <<ApplicationService>> {
+    +gestionarProductoAgotado(solicitud)
+  }
+  class EntregaApplicationService <<ApplicationService>> {
+    +gestionarEntrega(solicitud)
+  }
+  class RegistrarPedidoHandler <<CommandHandler>> {
+    +manejar(RegistrarPedido)
+  }
+  class AplicarPromocionHandler <<CommandHandler>> {
+    +manejar(AplicarPromocion)
+  }
+  class CancelarPedidoHandler <<CommandHandler>> {
+    +manejar(CancelarPedido)
+  }
+  interface ControlDeAcceso {
+    +verificarPermiso(responsable, accion)
+  }
+  interface PublicadorDeEventos {
+    +publicar(eventos)
+  }
+  interface Notificador {
+    +avisar(destinatarios, mensaje)
+  }
+  interface ConsultasDeDisponibilidad {
+    +estaAgotado(producto)
+  }
+}
+
+package "Infraestructura" #FAEEDA {
+  class PedidoRepositorySql <<Implementacion>>
+  class PedidoRepositoryEnMemoria <<Implementacion>>
+  class UnitOfWorkEnMemoria <<Implementacion>>
+  class ControlDeAccesoPorRol <<Implementacion>>
+  class PublicadorDeEventosEnMemoria <<Implementacion>>
+  class NotificadorInterno <<Implementacion>>
+}
+
+Pedido "1" *-- "1..*" LineaPedido : contiene
+Pedido "1" *-- "1..*" PreparacionEstacion : contiene
+Pedido *-- Cancelacion
+Pedido *-- PromocionAplicada
+Pedido --> Dinero
+Promocion *-- Vigencia
+Pedido ..> Promocion : referencia por ID
+Entrega ..> Pedido : referencia por ID
+Entrega ..> Repartidor : referencia por ID
+Merma ..> Pedido : referencia por ID
+
+AplicadorDePromocion ..> Pedido
+AplicadorDePromocion ..> Promocion
+AsignadorDeRepartidor ..> Entrega
+AsignadorDeRepartidor ..> Repartidor
+
+PedidoRepository ..> Pedido : gestiona
+PromocionRepository ..> Promocion : gestiona
+EntregaRepository ..> Entrega : gestiona
+RepartidorRepository ..> Repartidor : gestiona
+MermaRepository ..> Merma : gestiona
+
+PedidoApplicationService ..> ControlDeAcceso
+PedidoApplicationService ..> RegistrarPedidoHandler : delega
+PedidoApplicationService ..> CancelarPedidoHandler : delega
+RegistrarPedidoHandler ..> PedidoRepository
+RegistrarPedidoHandler ..> UnitOfWork
+RegistrarPedidoHandler ..> PublicadorDeEventos
+CancelarPedidoHandler ..> PedidoRepository
+CancelarPedidoHandler ..> MermaRepository
+CancelarPedidoHandler ..> UnitOfWork
+CancelarPedidoHandler ..> PublicadorDeEventos
+
+PedidoApplicationService ..> AplicarPromocionHandler : delega
+AplicarPromocionHandler ..> PedidoRepository
+AplicarPromocionHandler ..> PromocionRepository
+AplicarPromocionHandler ..> AplicadorDePromocion
+AplicarPromocionHandler ..> UnitOfWork
+
+DisponibilidadApplicationService ..> ControlDeAcceso
+DisponibilidadApplicationService ..> DisponibilidadRepository
+DisponibilidadApplicationService ..> ConsultasDeDisponibilidad
+DisponibilidadApplicationService ..> Notificador
+DisponibilidadApplicationService ..> PedidoRepository
+DisponibilidadApplicationService ..> UnitOfWork
+EntregaApplicationService ..> ControlDeAcceso
+EntregaApplicationService ..> EntregaRepository
+EntregaApplicationService ..> AsignadorDeRepartidor
+EntregaApplicationService ..> PedidoRepository
+EntregaApplicationService ..> RepartidorRepository
+EntregaApplicationService ..> UnitOfWork
+EntregaApplicationService ..> PublicadorDeEventos
+
+PedidoRepository <|.. PedidoRepositorySql
+PedidoRepository <|.. PedidoRepositoryEnMemoria
+UnitOfWork <|.. UnitOfWorkEnMemoria
+ControlDeAcceso <|.. ControlDeAccesoPorRol
+PublicadorDeEventos <|.. PublicadorDeEventosEnMemoria
+Notificador <|.. NotificadorInterno
+
+note bottom of DisponibilidadApplicationService
+  Se omiten por claridad los handlers de
+  gestionarProductoAgotado y gestionarEntrega,
+  y las Queries (ver Etapa 6). Por eso estos dos
+  servicios muestran sus dependencias directas.
+end note
+
+@enduml

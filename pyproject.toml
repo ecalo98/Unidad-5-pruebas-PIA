@@ -1,0 +1,13 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["src/sazon_urbano"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Errores reales (sintaxis, imports sin usar, nombres no definidos). No se reescribe código ya entregado en la U3.
+select = ["E4", "E9", "F"]

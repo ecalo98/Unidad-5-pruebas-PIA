@@ -1,0 +1,55 @@
+@startuml secuencia-cancelar-pedido
+title Secuencia: cancelar un pedido (CU-03, regla con excepción y alternativa)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign left
+autonumber
+
+actor Mesero
+actor Encargado
+participant "PedidoApplicationService" as PS
+participant "ControlDeAcceso" as CA
+participant "CancelarPedidoHandler" as H
+participant "UnitOfWork" as UoW
+participant "PedidoRepository" as PR
+participant "Pedido" as P
+participant "MermaRepository" as MR
+participant "PublicadorDeEventos" as EV
+
+Mesero -> PS : cancelarPedido(pedidoId, motivo)
+PS -> CA : verificarPermiso(Mesero, solicitar cancelación)
+CA --> PS : permitido
+PS -> H : manejar(CancelarPedido)
+H -> UoW : iniciar()
+H -> PR : obtenerPorId(pedidoId)
+PR --> H : pedido
+H -> P : cancelar(solicitante, motivo, autorizador)
+
+alt Ninguna estación ha iniciado (RN-02)
+  P --> H : pedido cancelado + evento PedidoCancelado
+  H -> PR : guardar(pedido)
+  H -> UoW : confirmar()
+  H -> EV : publicar(PedidoCancelado)
+  H --> PS : cancelación sin merma
+  PS --> Mesero : pedido cancelado
+else Preparación iniciada y sin autorización (RN-03)
+  P --> H : error CancelacionRequiereAutorizacion
+  H -> UoW : deshacer()
+  H --> PS : error de negocio
+  PS --> Mesero : se requiere autorización del Encargado
+  note over Mesero, Encargado
+    El Encargado autoriza y la solicitud
+    se repite con su autorización
+  end note
+else Preparación iniciada y autorizada por el Encargado (RN-03)
+  P --> H : pedido cancelado + evento PedidoCancelado
+  H -> MR : guardar(merma)
+  H -> PR : guardar(pedido)
+  H -> UoW : confirmar()
+  H -> EV : publicar(PedidoCancelado, MermaRegistrada)
+  H --> PS : cancelación con merma
+  PS --> Mesero : pedido cancelado con merma
+end
+
+@enduml

@@ -1,0 +1,27 @@
+PROYECTO COMPLETO DE SAZON URBANO CON LAS PRUEBAS DE LA UNIDAD 5 
+
+Abrir cmd DENTRO de esta carpeta (donde esta pyproject.toml) y ejecutar, en orden:
+
+  python --version                      (debe ser 3.11 o superior)
+  py -3.11 -m venv .venv
+  .venv\Scripts\activate.bat            (debe aparecer (.venv) al inicio de la linea)
+  python -m pip install -r requirements.txt
+  python -m pytest -v                   (debe terminar con: 50 passed)
+
+Otros comandos para mostrar al maestro:
+
+  python -m pytest tests/test_pia_unidad5.py -v     (21 pruebas nuevas: test_pia_01 a test_pia_21)
+  python -m unittest discover -v                    (pruebas de la Unidad 3: Ran 29 tests ... OK)
+  python -m ruff check src tests                    (All checks passed!)
+  python -m pytest -v --cov --cov-report=term-missing --cov-report=html --cov-fail-under=80
+  start htmlcov\index.html                          (reporte de cobertura en el navegador)
+
+Matriz de casos (docs\matriz_pruebas_pia.csv) con resultados reales:
+
+  set GENERAR_MATRIZ=1
+  python -m pytest -q
+  set GENERAR_MATRIZ=
+  (abrir docs\matriz_pruebas_pia.csv en Excel)
+
+Nota: el codigo de src\ es el de la Unidad 3, sin cambios. Los PDF de docs\ no se incluyen en este ZIP
+(no se necesitan para ejecutar); siguen en su repositorio original.

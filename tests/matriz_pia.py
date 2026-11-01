@@ -1,0 +1,67 @@
+"""Matriz de casos de prueba del PIA (Unidad 5): definición de cada caso y registro de lo observado.
+
+Cada prueba de tests/test_pia_unidad5.py llama a observar("PIA-XX", texto) con lo que realmente ocurrió.
+Con GENERAR_MATRIZ=1 pytest escribe docs/matriz_pruebas_pia.csv (esperado vs real y estado de cada caso).
+"""
+
+OBSERVADO: dict = {}
+
+# (id, regla, tipo, entrada, resultado esperado, prueba que lo verifica)
+CASOS = [
+    ("PIA-01", "RN-01 Monto mínimo a domicilio", "Éxito", "Domicilio con 2 órdenes de tacos (180 MXN)",
+     "Pedido confirmado, total 180", "test_pia_01_domicilio_sobre_el_minimo_se_confirma"),
+    ("PIA-02", "RN-01 Monto mínimo a domicilio", "Error", "Domicilio con 1 agua (20 MXN)",
+     "MontoMinimoDomicilioNoAlcanzado (faltan 130); no se guarda ni se publica nada",
+     "test_pia_02_domicilio_bajo_el_minimo_se_rechaza"),
+    ("PIA-03", "RN-01 Monto mínimo a domicilio", "Límite", "Domicilio de exactamente 150.00 MXN",
+     "Pedido confirmado, total 150", "test_pia_03_domicilio_de_exactamente_150_se_confirma"),
+    ("PIA-04", "RN-01 Monto mínimo a domicilio", "Límite", "Domicilio de 149.99 MXN",
+     "MontoMinimoDomicilioNoAlcanzado (faltan 0.01)", "test_pia_04_domicilio_de_149_99_se_rechaza"),
+    ("PIA-05", "RN-04 / NEC-05 Promociones", "Éxito", "Promoción del martes 20%, martes 19:00, pedido de 210 MXN",
+     "Descuento 36.00; total 174.00", "test_pia_05_promocion_vigente_recalcula_el_total"),
+    ("PIA-06", "RN-04 / NEC-05 Promociones", "Error", "Segunda promoción sobre un pedido que ya tiene una",
+     "PedidoYaTienePromocion; se conserva la primera promoción", "test_pia_06_segunda_promocion_se_rechaza"),
+    ("PIA-07", "RN-04 / NEC-05 Promociones", "Límite", "Promoción del martes aplicada a las 21:00 (hora fin)",
+     "Se aplica (la vigencia incluye la hora final); total 174.00",
+     "test_pia_07_promocion_en_la_hora_exacta_de_fin_se_aplica"),
+    ("PIA-08", "RN-04 / NEC-05 Promociones", "Límite", "Promoción del martes aplicada a las 21:01",
+     "PromocionFueraDeVigencia; el pedido queda sin promoción",
+     "test_pia_08_promocion_un_minuto_despues_del_fin_se_rechaza"),
+    ("PIA-09", "RN-02 Cancelación sin autorización", "Éxito", "Cancelar un pedido sin estaciones en preparación",
+     "Pedido cancelado, sin merma, con responsable y motivo", "test_pia_09_cancelacion_sin_preparacion_no_genera_merma"),
+    ("PIA-10", "RN-03 Cancelación con preparación", "Error", "Cancelar con parrilla en preparación y sin Encargado",
+     "CancelacionRequiereAutorizacion; el pedido sigue en preparación; sin merma",
+     "test_pia_10_cancelacion_con_preparacion_exige_al_encargado"),
+    ("PIA-11", "RN-02 / RN-03 Cancelación", "Límite", "Pedido de 2 estaciones con solo 1 en preparación, sin Encargado",
+     "CancelacionRequiereAutorizacion (basta una estación iniciada)",
+     "test_pia_11_basta_una_estacion_iniciada_para_exigir_autorizacion"),
+    ("PIA-12", "RN-03 Cancelación con preparación", "Éxito", "Cancelar con parrilla en preparación y autorización del Encargado",
+     "Pedido cancelado; 1 merma registrada; eventos PedidoCancelado y MermaRegistrada",
+     "test_pia_12_cancelacion_autorizada_registra_la_merma"),
+    ("PIA-13", "RN-11 Registro de entrega", "Éxito", "Asignar repartidor, registrar salida 19:10 y entrega 19:35",
+     "Entrega entregada con hora de salida y de entrega; pedido entregado",
+     "test_pia_13_entrega_registra_salida_y_entrega"),
+    ("PIA-14", "RN-11 Registro de entrega", "Error", "Confirmar la entrega sin haber registrado la salida",
+     "EntregaSinSalidaRegistrada; el pedido sigue listo", "test_pia_14_no_se_entrega_sin_salida_registrada"),
+    ("PIA-15", "RN-11 Registro de entrega", "Límite", "Entrega fallida con motivo de solo espacios",
+     "MotivoDeFallaObligatorio; la entrega sigue en ruta", "test_pia_15_entrega_fallida_con_motivo_en_blanco_se_rechaza"),
+    ("PIA-16", "Persistencia (Unit of Work)", "Éxito", "Registrar un pedido de mesa y consultarlo en el repositorio",
+     "El pedido queda guardado con su id, estado, responsable y canal", "test_pia_16_pedido_confirmado_queda_guardado"),
+    ("PIA-17", "Persistencia (Unit of Work)", "Error", "Falla técnica al guardar la merma durante una cancelación",
+     "Rollback: el pedido no queda cancelado, no hay merma ni eventos publicados",
+     "test_pia_17_falla_al_guardar_deshace_toda_la_operacion"),
+    ("PIA-18", "Persistencia (Unit of Work)", "Límite", "Modificar un pedido ya guardado dentro de una unidad de trabajo y deshacer",
+     "Se restaura la versión guardada antes de iniciar", "test_pia_18_deshacer_restaura_la_version_anterior"),
+    ("PIA-19", "Servicio externo simulado (Notificador)", "Éxito", "Cocina marca agotado un producto (Mock del Notificador)",
+     "Se avisa una sola vez a mesero y caja con el mensaje esperado",
+     "test_pia_19_se_avisa_a_mesero_y_caja_cuando_se_agota_un_producto"),
+    ("PIA-20", "Servicio externo simulado (Notificador)", "Error", "Falla técnica al guardar el producto agotado (Mock del Notificador)",
+     "Rollback y el Notificador no se invoca", "test_pia_20_si_no_se_guarda_no_se_avisa"),
+    ("PIA-21", "Servicio externo simulado (Notificador)", "Límite", "El Notificador no responde (TimeoutError) después de guardar",
+     "El producto queda agotado, pero el error llega al llamador",
+     "test_pia_21_si_el_aviso_falla_el_producto_ya_quedo_agotado"),
+]
+
+
+def observar(caso_id: str, texto: str) -> None:
+    OBSERVADO[caso_id] = texto
